@@ -1,0 +1,384 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Security Alert Backend API",
+    "version": "0.1.0",
+    "description": "OpenAPI spec for the security-alert-backend (dev stub). Includes endpoints for ingestion, normalization, embeddings, triage, ML, LLM, verdicts, response and tasks for frontend testing."
+  },
+  "servers": [
+    { "url": "http://localhost:3002/api", "description": "Local dev" }
+  ],
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Health check",
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/ingestion/raw": {
+      "post": {
+        "summary": "Ingest raw alert",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RawAlert" },
+              "examples": {
+                "rawExample": {
+                  "summary": "Raw alert payload",
+                  "value": {
+                    "id": "alert-123",
+                    "payload": {
+                      "message": "User login failed",
+                      "source": "syslog",
+                      "details": { "user": "alice", "ip": "10.0.0.1" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" },
+                "examples": {
+                  "created": {
+                    "summary": "Created ingestion response",
+                    "value": {
+                      "ok": true,
+                      "id": "alert-123",
+                      "alpha_id": "alpha-abc-001",
+                      "status": "created",
+                      "location": "/objects/raw/alpha-abc-001/alert-123.json",
+                      "received_at": "2025-08-17T12:01:05Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad Request" }
+        }
+      }
+    },
+    "/ingestion/raw-url": {
+      "get": {
+        "summary": "Get presigned upload URL for raw payload",
+        "responses": { "200": { "description": "URL returned" } }
+      }
+    },
+    "/normalization/{id}/normalized": {
+      "post": {
+        "summary": "Submit normalized alert",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Normalized" },
+              "examples": {
+                "normalizedExample": {
+                  "summary": "Normalized alert example",
+                  "value": {
+                    "id": "alert-123",
+                    "original": { "source": "syslog", "raw": { "msg": "Failed SSH" } },
+                    "mappings": [{ "field": "host", "value": "host-1" }],
+                    "normalized": {
+                      "severity": "high",
+                      "timestamp": "2025-08-17T12:00:00Z",
+                      "title": "Failed SSH login",
+                      "description": "Multiple failed SSH logins from 10.0.0.1",
+                      "observables": [{ "type": "ip", "value": "10.0.0.1" }],
+                      "metadata": { "sensor": "ossec", "facility": "auth" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" },
+                "examples": {
+                  "normalizedResponse": {
+                    "summary": "Normalized stored",
+                    "value": {
+                      "ok": true,
+                      "id": "alert-123",
+                      "alpha_id": "alpha-abc-001",
+                      "status": "normalized",
+                      "stored_at": "2025-08-17T12:02:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/normalization/normalize/trigger/{id}": {
+      "post": {
+        "summary": "Trigger normalization job",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "202": { "description": "Triggered" } }
+      }
+    },
+    "/embeddings/{id}/similar": {
+      "get": {
+        "summary": "Get similar alerts by embedding",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "k", "in": "query", "schema": { "type": "integer", "default": 5 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Array of similar items",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/SimilarityResult" } },
+                "examples": {
+                  "example": {
+                    "summary": "Similar alerts",
+                    "value": [
+                      { "alert_id": "alert-123", "score": 0.92, "alpha_id": "alpha-1" },
+                      { "alert_id": "alert-456", "score": 0.87, "alpha_id": "alpha-2" }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/embeddings/{id}/embedding": {
+      "post": {
+        "summary": "Create embedding for alert",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EmbeddingRequest" },
+              "examples": {
+                "example": {
+                  "summary": "Embedding payload",
+                  "value": { "vector": [0.123, -0.456, 0.789], "dimension": 3 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" },
+                "examples": {
+                  "embeddingResponse": {
+                    "summary": "Embedding stored",
+                    "value": {
+                      "ok": true,
+                      "embedding_id": "emb-789",
+                      "alert_id": "alert-123",
+                      "alpha_id": "alpha-abc-001",
+                      "created_at": "2025-08-17T12:03:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/triage/{id}/score/triage": {
+      "post": {
+        "summary": "Compute triage S0 and routing decision",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "properties": { "severity": { "type": "string" } } },
+              "examples": {
+                "example": { "summary": "Optional severity override", "value": { "severity": "high" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Triage result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TriageDecision" },
+                "examples": {
+                  "example": {
+                    "summary": "Sample triage result",
+                    "value": { "id": "alert-123", "alpha_id": "alpha-abc-001", "s0": 82, "decision": { "route": "verdict", "s1": 82 } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ml/{id}/agent-output": {
+      "post": {
+        "summary": "Submit ML agent output for an alert",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MLAgentOutput" } } } },
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/ml/{id}/aggregate-score": {
+      "post": {
+        "summary": "Submit aggregated ML pipeline score",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MLAggregate" } } } },
+        "responses": { "200": { "description": "Aggregated" } }
+      }
+    },
+    "/llm/{id}/llm-result": {
+      "post": {
+        "summary": "Submit LLM investigation result",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LLMResult" } } } },
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/verdicts/{id}/verdict": {
+      "post": {
+        "summary": "Submit final verdict for an alert",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Verdict" } } } },
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/verdicts/{id}/verdicts": {
+      "get": {
+        "summary": "List verdicts for an alert",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Array of verdicts", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Verdict" } } } } } }
+      }
+    },
+    "/response/{id}/response-action": {
+      "post": {
+        "summary": "Execute automatic response action (MCP) for an alert",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ResponseAction" } } } },
+        "responses": { "200": { "description": "Action scheduled/executed" } }
+      }
+    },
+    "/response/{id}/response-result": {
+      "post": {
+        "summary": "Report result of a response action",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ResponseResult" } } } },
+        "responses": { "200": { "description": "Result recorded" } }
+      }
+    },
+    "/tasks": {
+      "post": { "summary": "Create task", "requestBody": { "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Task" } } } }, "responses": { "200": { "description": "OK" } } },
+      "get": { "summary": "List tasks", "responses": { "200": { "description": "OK" } } }
+    },
+    "/admin/embeddings/build-index": {
+      "post": {
+        "summary": "Trigger similarity service to build index from ClickHouse",
+        "requestBody": { "content": { "application/json": { "schema": { "type": "object", "properties": { "limit": { "type": "integer" } } }, "examples": { "example": { "summary": "Build full index (limit)", "value": { "limit": 10000 } } } } } },
+        "responses": { "200": { "description": "Index build started", "content": { "application/json": { "schema": { "type": "object" }, "examples": { "example": { "summary": "Build response", "value": { "ok": true, "out": { "indexed": 12345, "duration_ms": 45210 } } } } } } }
+      }}
+    },
+    "/admin/embeddings/search": {
+      "post": {
+        "summary": "Proxy search to similarity service (vector or text)",
+        "requestBody": { "content": { "application/json": { "schema": { "type": "object", "properties": { "vector": { "type": "array", "items": { "type": "number" } }, "text": { "type": "string" }, "top_k": { "type": "integer" } } }, "examples": { "vector_example": { "summary": "Vector search", "value": { "vector": [0.12, -0.34, 0.56], "top_k": 5 } }, "text_example": { "summary": "Text search", "value": { "text": "failed login from 10.0.0.1", "top_k": 5 } } } } } },
+        "responses": { "200": { "description": "Search results", "content": { "application/json": { "schema": { "type": "object" }, "examples": { "example": { "summary": "Search result", "value": { "ok": true, "out": { "results": [{ "alert_id": "alert-123", "score": 0.92, "alpha_id": "alpha-1" }] } } } } } } }
+      }
+      }}
+  },
+  "components": {
+    "schemas": {
+      "RawAlert": {
+        "type": "object",
+        "required": ["id"],
+        "properties": { "id": { "type": "string" }, "payload": { "type": "object" } }
+      },
+      "Normalized": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "original": { "type": "object", "description": "Source-specific raw payload" },
+          "mappings": { "type": "array", "items": { "type": "object" } },
+          "normalized": {
+            "type": "object",
+            "properties": {
+              "severity": { "type": "string", "enum": ["critical", "high", "medium", "low", "unknown"] },
+              "timestamp": { "type": "string", "format": "date-time" },
+              "title": { "type": "string" },
+              "description": { "type": "string" },
+              "observables": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": { "type": { "type": "string" }, "value": { "type": "string" } }
+                }
+              },
+              "metadata": { "type": "object" }
+            },
+            "required": ["severity", "timestamp"]
+          }
+        }
+      },
+      "EmbeddingRequest": {
+        "type": "object",
+        "properties": {
+          "vector": { "type": "array", "items": { "type": "number" }, "description": "Embedding vector (array of floats)" },
+          "dimension": { "type": "integer", "description": "Optional vector dimensionality" },
+          "meta": { "type": "object", "description": "Optional embedding metadata (encoder, provenance)" }
+        },
+        "required": ["vector"]
+      },
+      "SimilarityResult": { "type": "object", "properties": { "alert_id": { "type": "string" }, "score": { "type": "number" }, "alpha_id": { "type": "string" } } },
+      "TriageDecision": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "s0": { "type": "number", "description": "Primary triage score (0-100)" },
+          "decision": {
+            "type": "object",
+            "properties": {
+              "route": { "type": "string", "enum": ["verdict", "ml"], "description": "Routing target" },
+              "s1": { "type": "number", "description": "Score forwarded downstream" },
+              "reason": {
+                "type": "object",
+                "properties": {
+                  "similarity_mean": { "type": "number" },
+                  "severity_base": { "type": "number" },
+                  "recency_factor": { "type": "number" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "MLAgentOutput": { "type": "object", "properties": { "agent": { "type": "string" }, "score": { "type": "number" }, "metadata": { "type": "object" } } },
+      "MLAggregate": { "type": "object", "properties": { "combined_score": { "type": "number" }, "weights": { "type": "object" } } },
+      "LLMResult": { "type": "object", "properties": { "summary": { "type": "string" }, "score": { "type": "number" } } },
+      "Verdict": { "type": "object", "properties": { "classification": { "type": "string", "enum": ["TP", "FP", "ESCALATE"] }, "confidence": { "type": "number" }, "notes": { "type": "string" } } },
+      "ResponseAction": { "type": "object", "properties": { "action": { "type": "string" }, "target": { "type": "object" }, "parameters": { "type": "object" } } },
+      "ResponseResult": { "type": "object", "properties": { "status": { "type": "string" }, "details": { "type": "object" } } },
+      "Task": { "type": "object", "properties": { "title": { "type": "string" }, "assignee": { "type": "string" }, "meta": { "type": "object" } } }
+    }
+  }
+}

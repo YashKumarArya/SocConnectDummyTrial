@@ -1,0 +1,13 @@
+import { Router } from 'express';
+import { getExport, postExportReady, getConfig, patchConfig, postBuildIndex, postSearch } from './admin.controller';
+import { metricsHandler } from '../../observability/metrics';
+const router = Router();
+router.get('/export', getExport);
+router.post('/:id/export-ready', postExportReady);
+router.get('/config/thresholds', getConfig);
+router.patch('/config/thresholds', patchConfig);
+router.post('/embeddings/build-index', postBuildIndex);
+router.post('/embeddings/search', postSearch);
+router.get('/healthz', (_, res) => res.send('ok'));
+router.get('/metrics', metricsHandler);
+export default router;

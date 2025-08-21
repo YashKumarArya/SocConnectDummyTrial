@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Security Alert Pipeline — Architecture & DB Diagrams</title>
+  <style>
+    :root{--bg:#ffffff;--card:#fff;--muted:#334155;--accent:#0b2545;--accent-2:#0ea5e9}
+    body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; margin: 0; background:var(--bg); color:#0b2545 }
+    .page { max-width:1100px; margin: 28px auto; padding: 24px }
+    h1 { margin: 0 0 12px 0; font-size:1.6rem }
+    h2 { margin-top:22px; margin-bottom:12px }
+    .diagram { background: var(--card); padding: 18px; border-radius: 10px; box-shadow: 0 6px 18px rgba(12,20,40,0.06); margin-bottom: 20px }
+    .note { font-size:0.95rem; color:var(--muted) }
+
+    /* Printable SVG sizing */
+    svg.diagram-svg { width:100%; height:auto; max-height:480px; display:block }
+    svg.diagram-svg text { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
+    .box { fill:#fbfdff; stroke:#cbd5e1; stroke-width:1; rx:8; }
+    .box-title { font-weight:700; font-size:13px; fill:#0b2545 }
+    .box-text { font-size:12px; fill:#334155 }
+    .arrow { stroke:#94a3b8; stroke-width:2 }
+
+    /* Payload snippet styling */
+    .payload-snippet { background:#0f172a; color:#fff; padding:10px 12px; border-radius:6px; font-family: Menlo, Monaco, monospace; font-size:0.9rem; display:inline-block }
+
+    /* Animation controls styling */
+    .controls { display:flex; gap:8px; align-items:center; margin-bottom:12px }
+    .btn { background:var(--accent); color:#fff; padding:8px 12px; border-radius:6px; border:none; cursor:pointer; font-weight:600 }
+    .btn:active { transform:translateY(1px) }
+    .pulse-highlight { box-shadow: 0 10px 30px rgba(14,165,233,0.18); transform: translateY(-4px); transition: all 300ms ease; }
+
+    /* Integration guide list highlight */
+    ol.guide { padding-left: 1.1rem }
+    ol.guide li { margin: 0.6rem 0 }
+    ol.guide li.highlight { background: linear-gradient(90deg, rgba(14,165,233,0.06), transparent); padding:6px 8px; border-radius:6px }
+
+    /* Responsive helpers */
+    .flex-row { display:flex; gap:16px; align-items:flex-start }
+    .flex-col { display:flex; flex-direction:column; gap:12px }
+    @media (max-width:900px){ .flex-row { flex-direction:column } svg.diagram-svg { max-height:360px } }
+
+    @media print {
+      .btn, .controls, .note.play-only { display:none }
+      svg.diagram-svg { max-height: none }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+  <!-- wrapper start injected for layout -->
+  <h1>Security Alert Pipeline — Architecture, DB schema and Data Flow</h1>
+  <p class="note">Generated: visual reference for engineers and integrators. Inline SVG diagrams replace Mermaid so this page prints/exports to PDF reliably (File → Print → Save as PDF).</p>
+
+  <h2>Database Structure (ClickHouse)</h2>
+  <div class="diagram" id="db-structure">
+    <svg class="diagram-svg" viewBox="0 0 1000 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Database structure diagram">
+      <defs>
+        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><path d="M0,0 L10,3.5 L0,7 Z" fill="#94a3b8"/></marker>
+      </defs>
+      <!-- Alerts raw -->
+      <rect class="box" x="40" y="32" width="240" height="160" rx="8"/>
+      <text x="60" y="58" class="box-title">alerts_raw</text>
+      <text x="60" y="78" class="box-text">- alpha_id  - alert_id</text>
+      <text x="60" y="96" class="box-text">- vendor  - product</text>
+      <text x="60" y="114" class="box-text">- received_at  - raw</text>
+
+      <!-- Alerts normalized -->
+      <rect class="box" x="360" y="20" width="300" height="200" rx="8"/>
+      <text x="380" y="46" class="box-title">alerts_normalized</text>
+      <text x="380" y="66" class="box-text">- alpha_id  - alert_id  - severity</text>
+      <text x="380" y="86" class="box-text">- timestamp  - observables  - normalized</text>
+      <text x="380" y="106" class="box-text">- embedding_id</text>
+
+      <!-- Alerts embeddings -->
+      <rect class="box" x="700" y="56" width="240" height="120" rx="8"/>
+      <text x="720" y="86" class="box-title">alerts_embeddings</text>
+      <text x="720" y="106" class="box-text">- alpha_id  - alert_id  - vector</text>
+      <text x="720" y="126" class="box-text">- embedding_id  - dimension  - created_at</text>
+
+      <!-- DLQ -->
+      <rect class="box" x="360" y="230" width="240" height="60" rx="8"/>
+      <text x="380" y="252" class="box-title">alerts_normalized_dlq</text>
+
+      <!-- arrows -->
+      <!-- Adjusted to align with box vertical centers -->
+      <line x1="280" y1="112" x2="360" y2="120" class="arrow" />
+      <line x1="660" y1="118" x2="700" y2="118" class="arrow" />
+      <line x1="520" y1="220" x2="520" y2="230" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrowhead)" />
+
+      <!-- labels -->
+      <text x="300" y="92" class="box-text">may produce</text>
+      <text x="660" y="96" class="box-text">may reference/create</text>
+      <text x="460" y="248" class="box-text">dlq if persist fails</text>
+    </svg>
+  </div>
+
+  <h2>Data Flow — Endpoints and Components</h2>
+  <div class="diagram" id="data-flow">
+    <svg class="diagram-svg" viewBox="0 0 1100 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Data flow diagram">
+      <defs>
+        <marker id="arrowhead2" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><path d="M0,0 L10,3.5 L0,7 Z" fill="#64748b"/></marker>
+      </defs>
+      <!-- Source boxes -->
+      <rect class="box" x="30" y="26" width="150" height="46" rx="8"/>
+      <text x="44" y="56" class="box-text">EDR / Endpoint</text>
+
+      <rect class="box" x="30" y="86" width="150" height="46" rx="8"/>
+      <text x="44" y="116" class="box-text">Email Security</text>
+
+      <rect class="box" x="30" y="146" width="150" height="46" rx="8"/>
+      <text x="44" y="176" class="box-text">Firewall / IPS</text>
+
+      <!-- Fluentd and API -->
+      <rect class="box" x="220" y="80" width="160" height="60" rx="8"/>
+      <text x="248" y="100" class="box-title">Fluentd / Forwarder</text>
+
+      <rect class="box" x="410" y="60" width="180" height="80" rx="8"/>
+      <text x="436" y="86" class="box-title">API Ingest</text>
+      <text x="436" y="106" class="box-text">POST /api/ingestion/raw</text>
+
+      <!-- MinIO and ClickHouse raw -->
+      <rect class="box" x="620" y="40" width="180" height="72" rx="8"/>
+      <text x="650" y="64" class="box-title">MinIO (raw store)</text>
+
+      <rect class="box" x="840" y="40" width="180" height="72" rx="8"/>
+      <text x="860" y="64" class="box-title">ClickHouse.alerts_raw</text>
+
+      <!-- Normalizer and embeddings -->
+      <rect class="box" x="410" y="180" width="180" height="72" rx="8"/>
+      <text x="436" y="206" class="box-title">Normalization Worker</text>
+
+      <rect class="box" x="620" y="180" width="180" height="72" rx="8"/>
+      <text x="650" y="206" class="box-title">Embedding Worker</text>
+
+      <rect class="box" x="840" y="180" width="180" height="72" rx="8"/>
+      <text x="860" y="206" class="box-title">ClickHouse.alerts_embeddings</text>
+
+      <!-- arrows (aligned to box centers) -->
+      <line x1="180" y1="49" x2="220" y2="110" class="arrow" marker-end="url(#arrowhead2)" />
+      <line x1="380" y1="110" x2="410" y2="100" class="arrow" marker-end="url(#arrowhead2)" />
+      <line x1="590" y1="100" x2="620" y2="76" class="arrow" marker-end="url(#arrowhead2)" />
+      <line x1="800" y1="76" x2="840" y2="76" class="arrow" marker-end="url(#arrowhead2)" />
+      <line x1="590" y1="216" x2="620" y2="216" class="arrow" marker-end="url(#arrowhead2)" />
+      <line x1="800" y1="216" x2="840" y2="216" class="arrow" marker-end="url(#arrowhead2)" />
+
+      <!-- labels -->
+      <text x="240" y="52" class="box-text">events →</text>
+      <text x="460" y="140" class="box-text">poll & normalize →</text>
+    </svg>
+  </div>
+
+  <h2>Flow Chart: Processing Steps</h2>
+  <div class="diagram" id="processing-steps">
+    <svg class="diagram-svg" viewBox="0 0 1000 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Processing steps">
+      <defs>
+        <marker id="arrowhead3" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><path d="M0,0 L10,3.5 L0,7 Z" fill="#64748b"/></marker>
+      </defs>
+      <g>
+        <rect class="box" x="30" y="20" width="160" height="60" rx="8"/>
+        <text x="50" y="54" class="box-title">Receive raw alert</text>
+        <text x="50" y="72" class="box-text">POST /api/ingestion/raw</text>
+
+        <rect class="box" x="220" y="20" width="200" height="60" rx="8"/>
+        <text x="240" y="54" class="box-title">Persist raw + alerts_raw</text>
+
+        <rect class="box" x="460" y="20" width="220" height="60" rx="8"/>
+        <text x="480" y="54" class="box-title">Normalization Worker</text>
+
+        <rect class="box" x="720" y="20" width="220" height="60" rx="8"/>
+        <text x="740" y="54" class="box-title">Persist normalized</text>
+
+        <line x1="190" y1="50" x2="220" y2="50" class="arrow" marker-end="url(#arrowhead3)" />
+        <line x1="420" y1="50" x2="460" y2="50" class="arrow" marker-end="url(#arrowhead3)" />
+        <line x1="680" y1="50" x2="720" y2="50" class="arrow" marker-end="url(#arrowhead3)" />
+
+        <!-- second row -->
+        <rect class="box" x="220" y="120" width="160" height="60" rx="8"/>
+        <text x="240" y="154" class="box-title">Emit embedding request</text>
+
+        <rect class="box" x="420" y="120" width="220" height="60" rx="8"/>
+        <text x="440" y="154" class="box-title">Generate embedding & index</text>
+
+        <rect class="box" x="700" y="120" width="240" height="60" rx="8"/>
+        <text x="720" y="154" class="box-title">Triage: POST /api/triage/{id}/score/triage</text>
+
+        <line x1="300" y1="150" x2="420" y2="150" class="arrow" marker-end="url(#arrowhead3)" />
+        <line x1="640" y1="150" x2="700" y2="150" class="arrow" marker-end="url(#arrowhead3)" />
+
+        <!-- final row -->
+        <rect class="box" x="360" y="240" width="280" height="72" rx="8"/>
+        <text x="380" y="270" class="box-title">Route: ML pipeline or Verdict agent</text>
+
+        <line x1="820" y1="150" x2="820" y2="240" class="arrow" marker-end="url(#arrowhead3)" />
+      </g>
+    </svg>
+  </div>
+
+  <h2>Endpoint Interaction — Payloads & Short Sequence Diagram (HTML)</h2>
+  <div class="diagram" id="endpoint-interaction">
+    <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start">
+      <div style="flex:1; min-width:280px">
+        <h3 style="margin-top:0">Sequence (HTTP requests)</h3>
+        <ol class="guide">
+          <li><strong>POST /api/ingestion/raw</strong> — payload: <span class="payload-snippet">{ id, payload }</span></li>
+          <li><strong>POST /api/normalization/{id}/normalized</strong> — payload: <span class="payload-snippet">{ normalized, severity, timestamp, observables }</span></li>
+          <li><strong>POST /api/embeddings/{id}/embedding</strong> — payload: <span class="payload-snippet">{ vector, dimension, meta }</span></li>
+          <li><strong>POST /api/triage/{id}/score/triage</strong> — payload: <span class="payload-snippet">{ severity? }</span></li>
+          <li><strong>POST /api/response/{id}/response-action</strong> — payload: <span class="payload-snippet">{ action, target, parameters }</span></li>
+        </ol>
+      </div>
+
+      <div style="flex:1; min-width:320px">
+        <h3 style="margin-top:0">Short interaction diagram</h3>
+        <svg class="diagram-svg" viewBox="0 0 520 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Endpoint interaction diagram">
+          <defs><marker id="ah" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><path d="M0,0 L10,3.5 L0,7 Z" fill="#94a3b8"/></marker></defs>
+          <rect class="box" x="20" y="20" width="120" height="40" rx="6"/><text x="34" y="46" class="box-text">Source</text>
+          <rect class="box" x="160" y="18" width="140" height="44" rx="6"/><text x="184" y="46" class="box-text">API Ingest</text>
+          <rect class="box" x="330" y="18" width="140" height="44" rx="6"/><text x="348" y="46" class="box-text">MinIO / CH</text>
+
+          <line x1="140" y1="40" x2="160" y2="40" class="arrow" marker-end="url(#ah)"/>
+          <line x1="300" y1="40" x2="330" y2="40" class="arrow" marker-end="url(#ah)"/>
+
+          <rect class="box" x="160" y="100" width="140" height="44" rx="6"/><text x="182" y="128" class="box-text">Normalizer</text>
+          <rect class="box" x="330" y="100" width="140" height="44" rx="6"/><text x="352" y="128" class="box-text">Embedding Worker</text>
+
+          <line x1="230" y1="62" x2="230" y2="100" class="arrow" marker-end="url(#ah)"/>
+          <line x1="300" y1="144" x2="330" y2="144" class="arrow" marker-end="url(#ah)"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="play-flow" class="btn">Play Flow</button>
+    <button id="stop-flow" class="btn">Stop</button>
+    <span class="note play-only">Animates Integration Guide list and diagram highlights (non-essential for PDF export).</span>
+  </div>
+
+  <h2>Integration Guide for External Teams</h2>
+  <ol class="guide">
+    <li>Ingesting systems: send events to Fluentd or POST /api/ingestion/raw. Include <code>alpha_id</code> if available.</li>
+    <li>Storage: raw payloads are persisted to MinIO — teams may upload large payloads directly to S3-compatible path.</li>
+    <li>Normalization: provide sample payloads or write normalized JSON to <code>/api/normalization/{id}/normalized</code>.</li>
+    <li>Embeddings & Similarity: push embeddings to <code>/api/embeddings/{id}/embedding</code> and call <code>/api/embeddings/{id}/similar</code> to retrieve similar alerts.</li>
+    <li>ML & Agents: submit agent outputs to <code>/api/ml/{id}/agent-output</code> and aggregate with <code>/api/ml/{id}/aggregate-score</code>.</li>
+    <li>LLM / Graph: export nodes/edges from ClickHouse or call enrichment endpoints for LLM investigations.</li>
+    <li>Response integrations: implement MCP adapters to accept verdicts and perform actions via <code>/api/response/{id}/response-action</code>.</li>
+  </ol>
+
+  <h2>Files & DDL</h2>
+  <p class="note">DDL files are located in <code>scripts/ddl/</code>. ClickHouse schema documentation is at <code>src/docs/clickhouse_schema.md</code>.</p>
+  <!-- wrapper end will be inserted before scripts -->
+  </div>
+
+  <script>
+    (function(){
+      // lightweight animator: cycles through integration guide items and diagram cards
+      const play = document.getElementById('play-flow');
+      const stop = document.getElementById('stop-flow');
+      let timer = null;
+      function itemsToAnimate(){
+        const guide = document.querySelectorAll('ol.guide > li');
+        const diagrams = document.querySelectorAll('.diagram');
+        return Array.from(guide).concat(Array.from(diagrams));
+      }
+      function clearAll(){
+        document.querySelectorAll('.pulse-highlight').forEach(el=>el.classList.remove('pulse-highlight'));
+        document.querySelectorAll('ol.guide li').forEach(li=>li.classList.remove('highlight'));
+      }
+      function start(){
+        const items = itemsToAnimate();
+        if(!items.length) return;
+        let idx = 0;
+        clearAll();
+        timer = setInterval(()=>{
+          clearAll();
+          const el = items[idx];
+          if(!el) return;
+          el.classList.add('pulse-highlight');
+          if(el.tagName === 'LI') el.classList.add('highlight');
+          idx = (idx + 1) % items.length;
+        }, 900);
+      }
+      function stopAnim(){ if(timer) clearInterval(timer); timer = null; clearAll(); }
+      play?.addEventListener('click', start);
+      stop?.addEventListener('click', stopAnim);
+      window.addEventListener('beforeunload', stopAnim);
+    })();
+  </script>
+</body>
+</html>
