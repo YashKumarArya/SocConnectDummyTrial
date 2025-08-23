@@ -23,7 +23,17 @@ if (fs.existsSync(openapiPath)) {
     console.warn('Could not read openapi.json:', err);
   }
 }
+// Serve the latest on-disk openapi.json so edits are visible without a full server restart.
 app.get('/api/openapi.json', (_req, res) => {
+  try {
+    if (fs.existsSync(openapiPath)) {
+      const raw = fs.readFileSync(openapiPath, 'utf8');
+      const spec = JSON.parse(raw);
+      return res.json(spec);
+    }
+  } catch (err) {
+    console.warn('Could not read openapi.json on request:', err);
+  }
   if (!openapiSpec) return res.status(404).json({ error: 'openapi spec not found' });
   res.json(openapiSpec);
 });
@@ -32,9 +42,9 @@ app.get('/api/openapi.json', (_req, res) => {
 try {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const swaggerUi = require('swagger-ui-express');
-  if (!openapiSpec) throw new Error('openapiSpec missing');
-  app.use('/api/docs/ui', swaggerUi.serve, swaggerUi.setup(openapiSpec, { explorer: true, swaggerOptions: { url: '/api/openapi.json' } }));
-  console.log('swagger-ui-express mounted at /api/docs/ui');
+  // Use runtime fetch of the on-disk spec so Swagger UI always displays the latest /api/openapi.json
+  app.use('/api/docs/ui', swaggerUi.serve, swaggerUi.setup(undefined, { explorer: true, swaggerOptions: { url: '/api/openapi.json' } }));
+  console.log('swagger-ui-express mounted at /api/docs/ui (fetching spec from /api/openapi.json)');
 } catch (e) {
   console.warn('swagger-ui-express not available or openapi missing, serving Redoc fallback at /api/docs/ui');
   app.get('/api/docs/ui', (_req, res) => {

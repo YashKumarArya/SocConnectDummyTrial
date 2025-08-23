@@ -10,6 +10,7 @@ import { startNormalizeWorker } from './workers/normalize.worker';
 import { startMlWorker } from './workers/ml.worker';
 import { startFaissWorker } from './workers/faiss.worker';
 import { startExportWorker } from './workers/export.worker';
+import { startWebhookDlqWorker } from './workers/webhook-dlq.worker';
 
 const PORT = Number(process.env.PORT || 3002);
 
@@ -26,6 +27,8 @@ async function bootstrap() {
     startMlWorker().catch((err) => console.error('ml worker', err));
     startFaissWorker().catch((err) => console.error('faiss worker', err));
     startExportWorker().catch((err) => console.error('export worker', err));
+    // start webhook DLQ worker (file-based) to retry failed outbound webhooks
+    startWebhookDlqWorker().catch((err) => console.error('webhook dlq worker', err));
 
     server.listen(PORT, () => {
       // eslint-disable-next-line no-console

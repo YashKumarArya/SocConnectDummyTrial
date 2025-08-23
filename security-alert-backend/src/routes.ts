@@ -9,6 +9,7 @@ import verdictsRouter from './features/verdicts/verdicts.router';
 import tasksRouter from './features/tasks/tasks.router';
 import responseRouter from './features/response/response.router';
 import adminRouter from './features/admin/admin.router';
+import edrRouter from './features/edr/edr.router';
 
 const router = Router();
 
@@ -23,6 +24,7 @@ router.use('/verdicts', verdictsRouter);
 router.use('/', tasksRouter); // tasks at /api/tasks
 router.use('/', responseRouter);
 router.use('/admin', adminRouter);
+router.use('/edr', edrRouter);
 
 router.get('/healthz', (_, res) => res.status(200).send('ok'));
 

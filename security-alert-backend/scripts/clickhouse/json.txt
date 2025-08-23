@@ -1,0 +1,168 @@
+{
+  "ocsf": {
+    "alert_id": "d0a6c4c0-2b1b-4d93-9a07-4d5d5f44b7c1",
+    "alpha_id": "alpha-abc-001",
+    "raw_object_key": "s3://alerts/2025/08/21/a1.json",
+    "source_vendor": "SentinelOne",
+    "source_product": "EDR",
+    "ingested_at": "2025-08-21T11:42:06.123",
+    "identified_at": "2025-08-21T11:42:05",
+    "originator_process": "svchost.exe",
+    "malicious_process_arguments": "svchost.exe -k netsvcs",
+    "process_user": "NT AUTHORITY\\SYSTEM",
+    "is_fileless": 0,
+    "file_path": "C:\\Windows\\System32\\svchost.exe",
+    "file_size": 1575525,
+    "file_extension": "exe",
+    "file_verification_type": "sha256RSA",
+    "file_signature_certificate_status": "valid",
+    "sha1": "356bb3a34e5ef3b3fdb4f1e03e44375befa8a3eb",
+    "sha256": "9d49eb24851eed0d549b23af2e1912bfb8f3c8fa84c52dd0c41724610abcd123",
+    "md5": "4bc006c9f27a997212c89955c1f0b8f5",
+    "file_depth": 3,
+    "file_entropy": 6.72,
+    "indicators": ["pua","service_install"],
+    "behavioral_indicators": ["persistence_attempt"],
+    "confidence_level": 87,
+    "classification": "Security Finding",
+    "mitigation_status": "not_mitigated",
+    "incident_status": "unresolved",
+    "analyst_verdict": "true_positive",
+    "threat_id": "2261508184229652674",
+    "threat_name": "PUA/WinService",
+    "detection_type": "realtime",
+    "agent_os_type": "windows",
+    "agent_mitigation_mode": "protect",
+    "agent_network_status": "connected",
+    "agent_is_active": 1,
+    "agent_domain": "CORP",
+    "agent_computer_name": "WIN-SOC-SRV01",
+    "agent_ipv4": "10.10.10.25",
+    "agent_version": "23.4.1",
+    "agent_last_logged_in_user_name": "corp\\svc-soc",
+    "agent_machine_type": "server",
+    "ocsf": null
+  }
+}
+
+{
+  "ocsf": {
+    "threat": {
+      "detected_time": "2025-08-21T11:42:05Z",
+      "id": "2261508184229652674",
+      "name": "PUA/WinService",
+      "confidence": 87,
+      "classification": "Security Finding",
+      "verdict": "true_positive",
+      "detection": { "type": "realtime" },
+      "indicators": ["pua","service_install"],
+      "behavior": { "observed": ["persistence_attempt"] }
+    },
+    "process": {
+      "name": "svchost.exe",
+      "cmd": { "args": "svchost.exe -k netsvcs" },
+      "isFileless": false
+    },
+    "actor": {
+      "process": { "user": { "name": "NT AUTHORITY\\SYSTEM" } },
+      "user": { "name": "corp\\svc-soc" }
+    },
+    "file": {
+      "path": "C:\\Windows\\System32\\svchost.exe",
+      "size": 1575525,
+      "extension": "exe",
+      "verification": { "type": "sha256RSA" },
+      "signature": { "certificate": { "status": "valid" } },
+      "hashes": {
+        "sha1": "356bb3a34e5ef3b3fdb4f1e03e44375befa8a3eb",
+        "sha256": "9d49eb24851eed0d549b23af2e1912bfb8f3c8fa84c52dd0c41724610abcd123",
+        "md5": "4bc006c9f27a997212c89955c1f0b8f5"
+      },
+      "analysis": { "depth": 3, "entropy": 6.72 }
+    },
+    "remediation": { "status": "not_mitigated" },
+    "incident": { "status": "unresolved" },
+    "device": {
+      "os": { "type": "windows" },
+      "domain": "CORP",
+      "hostname": "WIN-SOC-SRV01",
+      "ipv4_addresses": ["10.10.10.25"],
+      "agents": [
+        {
+          "state": "protect",
+          "is_active": true,
+          "version": "23.4.1"
+        }
+      ],
+      "network": { "status": "connected" }
+    }
+  }
+}
+Aryan
+ {
+    alert_id
+ source
+ title
+ severity 
+ status 
+ assigned analyst
+ Ai recommendation
+ }
+
+ dashboard{
+    investigation 
+    response mean time 
+    time saved
+ }
+ {
+  "payload": {
+    "ocsf": {
+      "threat": {
+        "detected_time": "2025-08-21T11:42:05Z",
+        "id": "2261508184229652674",
+        "name": "PUA/WinService",
+        "confidence": 87,
+        "classification": "Security Finding",
+        "verdict": "true_positive",
+        "detection": { "type": "realtime" },
+        "indicators": ["pua","service_install"],
+        "behavior": { "observed": ["persistence_attempt"] }
+      },
+      "process": {
+        "name": "svchost.exe",
+        "cmd": { "args": "svchost.exe -k netsvcs" },
+        "isFileless": false
+      },
+      "actor": {
+        "process": { "user": { "name": "NT AUTHORITY\\SYSTEM" } },
+        "user": { "name": "corp\\svc-soc" }
+      },
+      "file": {
+        "path": "C:\\Windows\\System32\\svchost.exe",
+        "size": 1575525,
+        "extension": "exe",
+        "verification": { "type": "sha256RSA" },
+        "signature": { "certificate": { "status": "valid" } },
+        "hashes": {
+          "sha1": "356bb3a34e5ef3b3fdb4f1e03e44375befa8a3eb",
+          "sha256": "9d49eb24851eed0d549b23af2e1912bfb8f3c8fa84c52dd0c41724610abcd123",
+          "md5": "4bc006c9f27a997212c89955c1f0b8f5"
+        },
+        "analysis": { "depth": 3, "entropy": 6.72 }
+      },
+      "remediation": { "status": "not_mitigated" },
+      "incident": { "status": "unresolved" },
+      "device": {
+        "os": { "type": "windows" },
+        "domain": "CORP",
+        "hostname": "WIN-SOC-SRV01",
+        "ipv4_addresses": ["10.10.10.25"],
+        "agents": [
+          { "state": "protect", "is_active": true, "version": "23.4.1" }
+        ],
+        "network": { "status": "connected" }
+      }
+    }
+  },
+  "routes_count": 30
+}

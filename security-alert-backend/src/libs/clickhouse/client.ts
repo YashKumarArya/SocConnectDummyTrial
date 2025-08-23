@@ -27,10 +27,19 @@ async function postSQL(sql: string, body?: string, retries = DEFAULT_RETRIES) {
   const fetchFn = await getFetch();
 
   try {
+    const headers: any = { 'Content-Type': 'text/plain' };
+    if (config.user && config.password) {
+      const token = Buffer.from(`${config.user}:${config.password}`).toString('base64');
+      headers.Authorization = `Basic ${token}`;
+    }
+
+    // If a body is provided it contains the row payloads; we must send the SQL followed by the body
+    const bodyText = body ? `${sql}\n${body}\n` : `${sql}\n`;
+
     const res = await fetchFn(config.url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: body ? `${body}\n` : sql
+      headers,
+      body: bodyText
     });
 
     if (!res.ok) {
@@ -224,7 +233,7 @@ export async function insertNormalized(rows: any[]) {
   }
 
   for (const chunk of chunks) {
-    const sql = `INSERT INTO security_alerts.alerts_normalized FORMAT JSONEachRow`;
+    const sql = `INSERT INTO soc.edr_alerts_ocsf FORMAT JSONEachRow`;
     const body = chunk.map((r) => JSON.stringify(r)).join('\n');
     await postSQL(sql, body);
   }
@@ -262,7 +271,7 @@ export async function insertDLQ(rows: any[], errorMessage?: string) {
   }
 
   for (const chunk of chunks) {
-    const sql = `INSERT INTO security_alerts.alerts_normalized_dlq FORMAT JSONEachRow`;
+    const sql = `INSERT INTO soc.alerts_normalized_dlq FORMAT JSONEachRow`;
     const body = chunk.map((r) => JSON.stringify(r)).join('\n');
     await postSQL(sql, body);
   }

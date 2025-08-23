@@ -297,15 +297,104 @@
         "summary": "Trigger similarity service to build index from ClickHouse",
         "requestBody": { "content": { "application/json": { "schema": { "type": "object", "properties": { "limit": { "type": "integer" } } }, "examples": { "example": { "summary": "Build full index (limit)", "value": { "limit": 10000 } } } } } },
         "responses": { "200": { "description": "Index build started", "content": { "application/json": { "schema": { "type": "object" }, "examples": { "example": { "summary": "Build response", "value": { "ok": true, "out": { "indexed": 12345, "duration_ms": 45210 } } } } } } }
-      }}
-    },
+      }},
     "/admin/embeddings/search": {
       "post": {
         "summary": "Proxy search to similarity service (vector or text)",
         "requestBody": { "content": { "application/json": { "schema": { "type": "object", "properties": { "vector": { "type": "array", "items": { "type": "number" } }, "text": { "type": "string" }, "top_k": { "type": "integer" } } }, "examples": { "vector_example": { "summary": "Vector search", "value": { "vector": [0.12, -0.34, 0.56], "top_k": 5 } }, "text_example": { "summary": "Text search", "value": { "text": "failed login from 10.0.0.1", "top_k": 5 } } } } } },
         "responses": { "200": { "description": "Search results", "content": { "application/json": { "schema": { "type": "object" }, "examples": { "example": { "summary": "Search result", "value": { "ok": true, "out": { "results": [{ "alert_id": "alert-123", "score": 0.92, "alpha_id": "alpha-1" }] } } } } } } }
       }
-      }}
+      }},
+    "/edr/alerts/{alphaId}/ocsf": {
+      "get": {
+        "summary": "Get nested OCSF payload for an alert by alpha_id",
+        "parameters": [
+          { "name": "alphaId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OCSF nested payload",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OCSFNestedResponse" },
+                "examples": {
+                  "example": {
+                    "summary": "Nested OCSF sample (realistic)",
+                    "value": {
+                      "payload": {
+                        "ocsf": {
+                          "threat": { "id": "2261508184229652674", "name": "Suspicious SSH Brute Force" },
+                          "event": {
+                            "id": "evt-789",
+                            "type": "authentication_failure",
+                            "severity": "high",
+                            "timestamp": "2025-08-17T12:00:00Z",
+                            "process": { "name": "sshd", "pid": 2345 }
+                          },
+                          "source": { "ip": "10.0.0.1", "hostname": "host-1", "vendor": "SentinelOne" },
+                          "observables": [
+                            { "type": "ip", "value": "10.0.0.1" },
+                            { "type": "user", "value": "alice" }
+                          ],
+                          "raw": { "message": "Failed password for invalid user alice from 10.0.0.1 port 54321 ssh2" }
+                        }
+                      },
+                      "routes_count": 30
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/edr/alerts/{alphaId}/ocsf/flat": {
+      "get": {
+        "summary": "Get flattened OCSF payload (dotted keys) for an alert by alpha_id",
+        "parameters": [
+          { "name": "alphaId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Flattened OCSF payload",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OCSFFlatResponse" },
+                "examples": {
+                  "example": {
+                    "summary": "Flattened OCSF sample (dotted keys)",
+                    "value": {
+                      "payload": {
+                        "ocsf": {
+                          "threat.id": "2261508184229652674",
+                          "threat.name": "Suspicious SSH Brute Force",
+                          "event.id": "evt-789",
+                          "event.type": "authentication_failure",
+                          "event.severity": "high",
+                          "event.timestamp": "2025-08-17T12:00:00Z",
+                          "event.process.name": "sshd",
+                          "source.ip": "10.0.0.1",
+                          "source.hostname": "host-1",
+                          "observables[0].type": "ip",
+                          "observables[0].value": "10.0.0.1",
+                          "observables[1].type": "user",
+                          "observables[1].value": "alice",
+                          "raw.message": "Failed password for invalid user alice from 10.0.0.1 port 54321 ssh2"
+                        }
+                      },
+                      "routes_count": 30
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Not found" }
+        }
+      }
+    }
   },
   "components": {
     "schemas": {
@@ -378,7 +467,31 @@
       "Verdict": { "type": "object", "properties": { "classification": { "type": "string", "enum": ["TP", "FP", "ESCALATE"] }, "confidence": { "type": "number" }, "notes": { "type": "string" } } },
       "ResponseAction": { "type": "object", "properties": { "action": { "type": "string" }, "target": { "type": "object" }, "parameters": { "type": "object" } } },
       "ResponseResult": { "type": "object", "properties": { "status": { "type": "string" }, "details": { "type": "object" } } },
-      "Task": { "type": "object", "properties": { "title": { "type": "string" }, "assignee": { "type": "string" }, "meta": { "type": "object" } } }
+      "Task": { "type": "object", "properties": { "title": { "type": "string" }, "assignee": { "type": "string" }, "meta": { "type": "object" } } },
+      "OCSFNestedResponse": {
+        "type": "object",
+        "properties": {
+          "payload": {
+            "type": "object",
+            "properties": {
+              "ocsf": { "type": "object" }
+            }
+          },
+          "routes_count": { "type": "integer" }
+        }
+      },
+      "OCSFFlatResponse": {
+        "type": "object",
+        "properties": {
+          "payload": {
+            "type": "object",
+            "properties": {
+              "ocsf": { "type": "object", "additionalProperties": true }
+            }
+          },
+          "routes_count": { "type": "integer" }
+        }
+      }
     }
   }
-}
+}}
