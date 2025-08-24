@@ -101,8 +101,20 @@ export async function postTriage(payload: any): Promise<any | null> {
     const FormDataPkg: any = await import('form-data');
     const FormData = FormDataPkg.default || FormDataPkg;
     const fd = new FormData();
+
+    // Ensure the file part has a .json filename — some triage endpoints reject non-JSON filenames
+    let fileNameToUse = String(payload?.triage_file_name || `${String(generateAlphaId(payload))}.json`);
+    try {
+      if (!fileNameToUse.toLowerCase().endsWith('.json')) {
+        // replace extension if present, otherwise append .json
+        fileNameToUse = fileNameToUse.replace(/\.[^.]+$/, '') + '.json';
+      }
+    } catch (e) {
+      fileNameToUse = `${String(generateAlphaId(payload))}.json`;
+    }
+
     fd.append('file', fileBuffer as Buffer, {
-      filename: payload?.triage_file_name || 'file.json',
+      filename: fileNameToUse,
       contentType: payload?.triage_file_content_type || 'application/json'
     });
 
@@ -193,6 +205,37 @@ export async function postTriage(payload: any): Promise<any | null> {
           const txt = res ? (res.bodyText || '<no body>') : '<no response>';
           lastErr = new Error(`postTriage failed status=${res ? res.status : 'no-resp'} body=${String(txt).slice(0,200)}`);
           console.error(`[${requestId}] ${lastErr.message}`);
+
+          // If server complains that only JSON files are supported, try falling back to a raw JSON POST
+          try {
+            if (res && res.status === 400 && String(res.bodyText || '').includes('Only JSON files are supported')) {
+              console.log(`[${requestId}] remote triage expects raw JSON — attempting fallback raw POST`);
+              try {
+                // Build a JSON wrapper object for fallback: include id/alpha_id and the triage JSON under 'triage'
+                let rawBodyContent: any = undefined;
+                try { rawBodyContent = JSON.parse((fileBuffer as Buffer).toString('utf8')); } catch (e) { rawBodyContent = (fileBuffer as Buffer).toString('utf8'); }
+                const fallbackBody = JSON.stringify({ id: payload?.id, alpha_id: payload?.alpha_id, triage: rawBodyContent });
+                const rawRes = await fetchFn(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: fallbackBody });
+                const rawText = await rawRes.text().catch(() => '');
+                try {
+                  const parsed = JSON.parse(rawText || '{}');
+                  if (rawRes.ok) {
+                    console.log(`[${requestId}] postTriage raw POST succeeded`);
+                    return parsed;
+                  } else {
+                    console.warn(`[${requestId}] postTriage raw POST failed status=${rawRes.status} body=${String(rawText).slice(0,200)}`);
+                  }
+                } catch (e) {
+                  console.warn(`[${requestId}] postTriage raw POST response not JSON, status=${rawRes.status}`);
+                  if (rawRes.ok) return null;
+                }
+              } catch (e) {
+                console.warn(`[${requestId}] fallback raw POST attempt failed`, String(e));
+              }
+            }
+          } catch (e) {
+            /* ignore fallback errors */
+          }
         } else {
           // parse response (res.json already if parsed)
           if (res.json) {
