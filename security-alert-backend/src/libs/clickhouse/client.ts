@@ -1,4 +1,5 @@
 import config from './index';
+import { generateAlphaId } from '../alpha_id';
 
 const MAX_BATCH = 100;
 const DEFAULT_RETRIES = 3;
@@ -159,7 +160,7 @@ export async function insertNormalized(rows: any[]) {
     const timestamp = normalizeTimestamp(timestampRaw) || new Date().toISOString();
 
     return {
-      alpha_id: r.alpha_id || r.alphaId || r.alpha || r.alpha || (r.alert_id || r.id) || 'unknown',
+      alpha_id: generateAlphaId(r),
       alert_id: r.alert_id || r.id || null,
       vendor: r.vendor || null,
       product: r.product || null,

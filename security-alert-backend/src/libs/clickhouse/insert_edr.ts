@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
+import { generateAlphaId } from '../alpha_id';
 import config from './index';
 
 async function getFetch() {
@@ -21,7 +22,7 @@ export async function insertEDR(alert: any) {
 
   // Use alpha_id as the canonical key. Do NOT fallback to alert.id (we don't want alert id to be the primary key).
   // If alpha_id is missing, generate one (stable uuid) so every row has a key.
-  const alphaId = alert.alpha_id || alert.alphaId || uuidv4();
+  const alphaId = generateAlphaId(alert);
 
   const row: any = {
     // removed alert_id -- DDL does not have an alert_id column; alpha_id is the key

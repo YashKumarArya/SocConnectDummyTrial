@@ -1,0 +1,78 @@
+# Core FastAPI and web framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# Data processing and ML
+pandas==2.1.3
+numpy==1.25.2
+scikit-learn==1.3.2
+xgboost==2.0.2
+
+# Deep Learning (PyTorch)
+torch==2.1.1
+torchvision==0.16.1
+torchaudio==0.16.1
+
+# Neo4j and Graph Database
+neo4j==5.14.1
+langchain-neo4j==0.0.6
+langchain-openai==0.0.5
+langchain==0.1.0
+
+# OpenAI and LLM
+openai==1.3.8
+
+# Environment and configuration
+python-dotenv==1.0.0
+
+# HTTP requests
+requests==2.31.0
+
+# Date and time handling (included in standard library, but listing for clarity)
+# datetime - built-in
+
+# JSON handling (built-in)
+# json - built-in
+
+# Regular expressions (built-in)
+# re - built-in
+
+# Math operations (built-in)
+# math - built-in
+
+# Type hints and dataclasses (built-in for Python 3.7+)
+# typing - built-in
+# dataclasses - built-in
+
+# OS operations (built-in)
+# os - built-in
+
+# Threading and concurrency
+# asyncio - built-in
+# concurrent.futures - built-in
+# threading - built-in
+
+# Temporary files (built-in)
+# tempfile - built-in
+
+# Time operations (built-in)
+# time - built-in
+
+# Random operations (built-in)
+# random - built-in
+
+# Memory tools for LangChain agents
+langchain-community==0.0.10
+
+# Additional LangChain dependencies
+langchain-core==0.1.10
+
+# Async HTTP client (if needed for internal requests)
+httpx==0.25.2
+
+# Pickle operations (built-in)
+# pickle - built-in
+
+# Collections (built-in)
+# collections - built-in

@@ -52,7 +52,16 @@ async function appendToDLQ(entry: any) {
 
 export async function sendRawWebhook(payload: any) {
   const url = process.env.OUTBOUND_WEBHOOK_RAW || process.env.OUTBOUND_WEBHOOK_URL;
-  if (!url) return false;
+  // Allow quick disable of outbound webhooks during local testing
+  if (process.env.OUTBOUND_WEBHOOK_DISABLED === '1') {
+    console.debug('sendRawWebhook skipped: OUTBOUND_WEBHOOK_DISABLED=1');
+    return false;
+  }
+  // Treat empty or placeholder URLs (example.com) as disabled
+  if (!url || url.includes('example.com')) {
+    console.debug('sendRawWebhook skipped: outbound webhook disabled or placeholder URL');
+    return false;
+  }
   const auth = process.env.OUTBOUND_WEBHOOK_AUTH || undefined;
   const headers: any = {};
   if (auth) headers.Authorization = auth.replace(/^'+|'+$/g, '');
@@ -68,6 +77,11 @@ export async function sendRawWebhook(payload: any) {
 
 export async function sendNormalizedWebhook(payload: any) {
   const url = process.env.OUTBOUND_WEBHOOK_NORMALIZED || process.env.OUTBOUND_WEBHOOK_URL;
+  // Allow quick disable of outbound webhooks during local testing
+  if (process.env.OUTBOUND_WEBHOOK_DISABLED === '1') {
+    console.debug('sendNormalizedWebhook skipped: OUTBOUND_WEBHOOK_DISABLED=1');
+    return false;
+  }
   if (!url) return false;
   const auth = process.env.OUTBOUND_WEBHOOK_AUTH || undefined;
   const headers: any = {};

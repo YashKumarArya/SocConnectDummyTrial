@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { generateAlphaId } from '../../libs/alpha_id';
 
 export type IngestRecord = {
   id: string;
@@ -24,8 +25,7 @@ export const ingestionRepo = {
   async saveRaw(alert?: any, opts?: { allowOverwrite?: boolean }) {
     if (!alert) return;
 
-    const id =
-      alert?.alpha_id || alert?.alphaId || alert?.id || (typeof randomUUID === 'function' ? randomUUID() : String(Date.now()));
+    const id = generateAlphaId(alert);
 
     const existing = this._store.get(id) as IngestRecord | undefined;
 

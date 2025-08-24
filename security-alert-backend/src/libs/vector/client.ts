@@ -1,5 +1,5 @@
 // Lightweight vector client for ClickHouse (inserts + simple reads)
-import { randomUUID } from 'crypto'
+import { generateAlphaId } from '../alpha_id'
 
 async function getFetch() {
   // runtime fetch resolver: prefer global fetch (Node 18+), otherwise dynamic import
@@ -24,7 +24,7 @@ export type EmbeddingRow = {
 
 export async function insertEmbedding(row: Omit<EmbeddingRow, 'created_at'|'embedding_id'> & { embedding_id?: string }) {
   const fetcher = await getFetch()
-  const embedding_id = row.embedding_id || randomUUID()
+  const embedding_id = row.embedding_id || generateAlphaId()
   const payload = {
     alpha_id: row.alpha_id,
     alert_id: row.alert_id,
