@@ -60,18 +60,14 @@ export async function postRawAlert(req: Request, res: Response) {
     })().catch((e) => console.error('background normalization failed', e));
   }
 
-  // Attempt immediate persistence into ClickHouse (synchronous best-effort).
-  // On success mark processed; on failure mark failed so workers can retry.
-  try {
-    await insertEDR(alert);
-    await ingestionRepo.markProcessed(rec.id);
-    // best-effort: notify outbound webhook of raw ingestion
-    try { await sendRawWebhook(alert); } catch (e) { /* swallow */ }
-    return res.status(201).json({ ok: true, id: alert.id, alpha_id: alert.alpha_id || alphaId, rec });
-  } catch (err: any) {
-    await ingestionRepo.markFailed(rec.id);
-    return res.status(500).json({ ok: false, error: String(err?.message || err) });
-  }
+  // Do not perform an immediate EDR/OCSF insert here to avoid duplicate rows.
+  // The normalization service/worker will perform the canonical insert into
+  // `soc.edr_alerts_ocsf` once normalization completes.
+  // Best-effort: notify outbound webhook of raw ingestion (do not block response).
+  try { await sendRawWebhook(alert); } catch (e) { /* swallow */ }
+
+  // Respond with the saved record and canonical alpha_id so callers can continue.
+  return res.status(201).json({ ok: true, id: alert.id, alpha_id: alert.alpha_id || alphaId, rec });
 }
 
 export async function getRawUploadUrl(req: Request, res: Response) {

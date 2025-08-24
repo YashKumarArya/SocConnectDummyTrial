@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
+import { generateAlphaId } from '../alpha_id';
 import config from './index';
 
 async function getFetch() {
@@ -19,7 +20,7 @@ export async function insertAlertsRaw(alert: any) {
   const fetchFn = await getFetch();
   if (!alert) throw new Error('missing alert');
 
-  const alphaId = alert.alpha_id || alert.alphaId || uuidv4();
+  const alphaId = generateAlphaId(alert);
   const alertId = alert.id || '';
 
   const row: any = {

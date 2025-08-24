@@ -82,6 +82,7 @@ app.post('/triage', upload.single('file'), (req, res) => {
     if (req.file && req.file.buffer) {
       try {
         const text = req.file.buffer.toString('utf8');
+        // Keep dot-notation keys as-is (1.json style) by parsing into an object
         payload = JSON.parse(text);
       } catch (e) {
         // not JSON — attach raw text and metadata
@@ -97,10 +98,39 @@ app.post('/triage', upload.single('file'), (req, res) => {
     console.log('=== TRIAGE DEBUG RECEIVED ===');
     console.log(JSON.stringify(payload, null, 2));
     console.log('=== END TRIAGE DEBUG ===');
+
+    // Run local mock predictor and return model-like response so tests can be end-to-end
+    const samplePrediction = {
+      prediction: {
+        predicted_verdict: 'true_positive',
+        confidence: 0.9057955741882324,
+        probabilities: {
+          false_positive: 0.027794601395726204,
+          true_positive: 0.9057955741882324,
+          undefined: 0.06640981882810593
+        }
+      },
+      metadata: {
+        top_contributing_features: {
+          'threat.detection.type': { value: -1.2917195229006553, importance_weight: 0.12923437356948853, contribution_score: 0.16693456336954476 },
+          'file.extension': { value: 1.1476380835140088, importance_weight: 0.13603204488754272, contribution_score: 0.15611555529123114 },
+          'remediation.status': { value: -1.1685890055328445, importance_weight: 0.12087996304035187, contribution_score: 0.14125899579817178 }
+        },
+        all_features: {
+          'process.name': { value: -0.3526773614545564, importance_weight: 0.11075733602046967, contribution_score: 0.03906160502943494 },
+          'file.path': { value: 0.3830278414198296, importance_weight: 0.1066397950053215, contribution_score: 0.04084601049034142 },
+          'file.size': { value: 0.8967948710061774, importance_weight: 0.09464701265096664, contribution_score: 0.08487895550144367 }
+        }
+      },
+      model_version: 'local-mock-v1',
+      timestamp: new Date().toISOString()
+    };
+
+    return res.json({ ok: true, debug: true, received: payload, model: samplePrediction });
   } catch (e) {
     console.error('failed to log triage payload', e);
+    return res.status(500).json({ ok: false, error: 'failed to parse triage payload' });
   }
-  res.json({ ok: true, debug: true });
 });
 
 // Fetch last N triage payloads (debug)
