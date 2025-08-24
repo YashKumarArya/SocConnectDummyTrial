@@ -1,0 +1,42 @@
+{
+  "alert": { "id": "test-alert-001" },
+  "threat": {
+    "id": "th-123",
+    "detected_time": "2025-08-24T00:00:00Z",
+    "name": "Test Threat",
+    "classification": "malware",
+    "confidence": 0.9,
+    "verdict": "suspicious"
+  },
+  "time": "2025-08-24T00:00:00Z",
+  "file": {
+    "uid": "file-1",
+    "path": "C:\\Users\\Public\\malicious.exe",
+    "extension": ".exe",
+    "size": 12345,
+    "verification": {"type": "notsigned"},
+    "signature": {"certificate": {"status": false, "issuer": "Unknown"}},
+    "hashes": {"sha256": "abc123"},
+    "reputation": {"score": 5}
+  },
+  "process": {"name": "powershell.exe", "cmd": {"args": "-enc ..."}, "isFileless": false},
+  "device": {
+    "uuid": "dev-1",
+    "hostname": "host1",
+    "domain": "example.local",
+    "ipv4_addresses": ["10.0.0.1"],
+    "network": {"status": "up"},
+    "is_active": true,
+    "interface": {"mac": "aa:bb:cc:dd", "ip": "203.0.113.5", "name": "eth0"},
+    "location": {"uid": "loc-1", "desc": "HQ"},
+    "groups": [],
+    "os": {"name": "Windows", "build": "10.0.19043", "type": "Windows"}
+  },
+  "metadata": {"product": {"feature": {"name": "SentinelOne Cloud", "version": "1.0"}, "name": ["SentinelOne Cloud"]}},
+  "enrichments": [
+    {"data": {"resource": "cp-resource", "positives": 0}},
+    {"data": {"total": 60, "positives": 5, "malicious": 3, "suspicious": 2, "scan_time": "2025-08-01T00:00:00Z", "stats": {"malicious": 3, "suspicious": 2, "undetected": 55, "harmless": 0}}}
+  ],
+  "remediation": {"uid": "rem-1", "status": "open", "desc": "Quarantine", "start_time": "2025-08-24T00:10:00Z", "end_time": null, "result": "pending"},
+  "incident": {"status": "new", "desc": "auto-detected"}
+}
