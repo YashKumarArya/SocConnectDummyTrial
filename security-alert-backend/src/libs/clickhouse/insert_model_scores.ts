@@ -29,64 +29,28 @@ export type WideRow = {
   alpha_id: string;
   ts?: string;
 
-  gnn_score: number;
-  gnn_confidence: number;
-  gnn_verdict: string;
-
-  ml_score: number;
-  ml_confidence: number;
-  ml_verdict: string;
-
-  rule_score: number;
+  // From triage (rule-based)
   rule_confidence: number;
   rule_verdict: string;
-
-  meta: string;
+  rule_meta: string; // JSON string: triage.metadata
 };
 
 export function fromTriageToWideRow(
   alert_id: string,
   alpha_id: string,
   triage: TriageAgent,
-  opts?: { v4_fields_present?: number; v4_fields_total?: number; v4_schema_version?: string }
+  _opts?: { v4_fields_present?: number; v4_fields_total?: number; v4_schema_version?: string }
 ): WideRow {
-  const rule_score = safeNumber(triage?.prediction?.risk_score ?? 0);
   const rule_confidence = safeNumber(triage?.prediction?.confidence ?? 0);
   const rule_verdict = String(triage?.prediction?.predicted_verdict ?? '');
-
-  const metaObj: Record<string, any> = {
-    ...(opts?.v4_fields_present != null && {
-      v4_fields_present: opts.v4_fields_present,
-      v4_fields_total: opts.v4_fields_total ?? 101,
-      v4_schema_version: opts.v4_schema_version ?? 'v4',
-      v4_coverage_pct:
-        opts?.v4_fields_present != null && (opts?.v4_fields_total ?? 101) > 0
-          ? +(((opts.v4_fields_present as number) / (opts.v4_fields_total ?? 101)) * 100).toFixed(2)
-          : undefined
-    }),
-    triage_summary: {
-      verdict: rule_verdict,
-      risk_score: rule_score,
-      model_version: triage.model_version ?? null,
-      timestamp: triage.timestamp ?? null
-    },
-    agent1: triage?.metadata?.agent1_score ?? undefined,
-    agent2: triage?.metadata?.agent2_score ?? undefined
-  };
+  const rule_meta = JSON.stringify(triage?.metadata ?? {});
 
   return {
     alert_id,
     alpha_id,
-    gnn_score: 0,
-    gnn_confidence: 0,
-    gnn_verdict: '',
-    ml_score: 0,
-    ml_confidence: 0,
-    ml_verdict: '',
-    rule_score,
     rule_confidence,
     rule_verdict,
-    meta: JSON.stringify(metaObj)
+    rule_meta
   };
 }
 
@@ -115,7 +79,9 @@ export async function insertTriageWide(rows: WideRow[]) {
   }
 
   for (const chunk of chunks) {
-    const sql = `INSERT INTO soc.alert_model_scores_wide FORMAT JSONEachRow`;
+    // Insert into the table created by the user: alert_model_scores_wide
+    // Provide an explicit column list matching the JSON rows we build.
+    const sql = `INSERT INTO alert_model_scores_wide (alert_id, alpha_id, rule_confidence, rule_verdict, rule_meta) FORMAT JSONEachRow`;
     const body = chunk.map((r) => JSON.stringify(r)).join('\n');
     await postSQL(sql, body);
   }

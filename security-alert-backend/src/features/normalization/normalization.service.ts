@@ -273,6 +273,46 @@ export const normalizationService = {
                      } catch (e: any) {
                        console.warn('create-graph call failed', e?.message || e);
                      }
+
+                     // After create-graph, call investigate-agentic/{alert_id} then summary/{alert_id}
+                     try {
+                       const alertIdForNext = String(row.alert_id || id || triagePayload?.id || '');
+                       const fetchAny = (globalThis as any).fetch || (await import('node-fetch')).default;
+                       const defaultInvestigate = 'https://ec2f9a613e8c.ngrok-free.app/investigate-agentic/{alert_id}';
+                       const defaultSummary = 'https://ec2f9a613e8c.ngrok-free.app/summary/{alert_id}';
+                       const invTmpl = process.env.INVESTIGATE_AGENTIC_URL || defaultInvestigate;
+                       const sumTmpl = process.env.SUMMARY_URL || defaultSummary;
+                       const invUrl = invTmpl.replace('{alert_id}', encodeURIComponent(alertIdForNext));
+                       const sumUrl = sumTmpl.replace('{alert_id}', encodeURIComponent(alertIdForNext));
+
+                       // investigate-agentic (POST)
+                       const invTimeout = Number(process.env.INVESTIGATE_AGENTIC_TIMEOUT_MS || '30000');
+                       {
+                         const controller = new AbortController();
+                         const to = setTimeout(() => controller.abort(), invTimeout);
+                         try {
+                           console.log('investigateAgenticCall', { url: invUrl, timeoutMs: invTimeout });
+                           const resp = await fetchAny(invUrl, { method: 'POST', headers: { 'Accept': 'application/json' }, signal: controller.signal });
+                           let out: any = null; try { out = await resp.json(); } catch { out = await resp.text().catch(() => ''); }
+                           console.log('investigateAgenticResp', { status: resp.status, body: typeof out === 'string' ? out : JSON.stringify(out) });
+                         } finally { clearTimeout(to); }
+                       }
+
+                       // summary (POST)
+                       const sumTimeout = Number(process.env.SUMMARY_TIMEOUT_MS || '30000');
+                       {
+                         const controller = new AbortController();
+                         const to = setTimeout(() => controller.abort(), sumTimeout);
+                         try {
+                           console.log('summaryCall', { url: sumUrl, timeoutMs: sumTimeout });
+                           const resp = await fetchAny(sumUrl, { method: 'POST', headers: { 'Accept': 'application/json' }, signal: controller.signal });
+                           let out: any = null; try { out = await resp.json(); } catch { out = await resp.text().catch(() => ''); }
+                           console.log('summaryResp', { status: resp.status, body: typeof out === 'string' ? out : JSON.stringify(out) });
+                         } finally { clearTimeout(to); }
+                       }
+                     } catch (e: any) {
+                       console.warn('post-create-graph followups failed', e?.message || e);
+                     }
                  } else {
                    console.log('supervisor skipped due to ruleScore outside 0-79', { ruleScore });
                  }
