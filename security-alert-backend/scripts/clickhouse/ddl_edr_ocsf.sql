@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS soc.edr_alerts_ocsf
     indicators Array(String)                                  COMMENT 'threat.indicators',
     behavioral_indicators Array(String)                       COMMENT 'threat.behavior.observed',
     confidence_level UInt8 DEFAULT 0                          COMMENT 'threat.confidence',
+    is_confident Bool DEFAULT 0                               COMMENT 'threat.confidence.is_confident',
     classification LowCardinality(String) DEFAULT ''          COMMENT 'threat.classification',
     analyst_verdict LowCardinality(String) DEFAULT ''         COMMENT 'threat.verdict',
     threat_id String DEFAULT ''                               COMMENT 'threat.id',

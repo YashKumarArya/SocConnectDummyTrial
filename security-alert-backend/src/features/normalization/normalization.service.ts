@@ -14,7 +14,7 @@ export const normalizationService = {
     function buildTriageJson(origObj: any, normalizedObj: any) {
       // Return the raw/original object when it looks like the 1.json sample so ML receives the complete alert
       if (!origObj) origObj = {};
-      const looksLikeSample = typeof origObj === 'object' && (origObj['file.name'] || origObj.file || origObj.id);
+      const looksLikeSample = typeof origObj === 'object' && (origObj['file.name'] || origObj.file || orig.id);
       if (looksLikeSample) return (typeof origObj === 'string') ? (() => {
         try { return JSON.parse(origObj); } catch (e) { return { data: origObj }; }
       })() : origObj;
@@ -147,20 +147,42 @@ export const normalizationService = {
                const wide = fromTriageToWideRow(String(row.alert_id || ''), String(row.alpha_id || ''), triageResp as any, { v4_fields_present: undefined });
                console.log('triageWideRow:', JSON.stringify(wide, null, 2));
 
-               // If triage indicates a high rule risk (79-100) call external supervisor agent
+               // Evaluate supervisor condition and log decision
+               const ruleScoreRaw = (triageResp as any)?.prediction?.risk_score;
+               const ruleScore = Number(ruleScoreRaw);
+               const shouldCallSupervisor = Number.isFinite(ruleScore) && ruleScore >= 0 && ruleScore <= 79;
+               console.log('supervisorCheck', { key, acquired: true, ruleScore, source: 'prediction.risk_score', shouldCallSupervisor });
+
+               // If triage indicates a low-to-medium rule risk (0-79) call external supervisor agent
                try {
-                 const ruleScore = Number(triageResp?.prediction?.risk_score ?? triageResp?.prediction?.risk ?? 0);
-                 if (!isNaN(ruleScore) && ruleScore >= 79 && ruleScore <= 100) {
+                 if (shouldCallSupervisor) {
                    try {
                      const fetchFn = (globalThis as any).fetch || (await import('node-fetch')).default;
-                     const supervisorUrl = process.env.SUPERVISOR_URL || 'https://6e06e665c655.ngrok-free.app/supervisor-agent?source=edr';
+                     const rawSupervisor = process.env.SUPERVISOR_URL || 'https://91baa41b9d55.ngrok-free.app/supervisor-agent';
+                     let supervisorUrl = rawSupervisor;
+                     try {
+                       const u = new URL(rawSupervisor);
+                       if (!u.searchParams.has('source')) u.searchParams.set('source', 'edr');
+                       supervisorUrl = u.toString();
+                     } catch {
+                       supervisorUrl = rawSupervisor + (rawSupervisor.includes('?') ? '&' : '?') + 'source=edr';
+                     }
                      const timeoutMs = Number(process.env.SUPERVISOR_TIMEOUT_MS || '8000');
                      const controller = new AbortController();
                      const to = setTimeout(() => controller.abort(), timeoutMs);
                      let supervisorResp: any = null;
                      try {
-                       const body = JSON.stringify({ alert_id: row.alert_id || id, alpha_id: row.alpha_id, triage: triageResp });
-                       const supRes = await fetchFn(supervisorUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: controller.signal });
+                       // Supervisor expects nested JSON (or { alert_json: {...} }). Convert dotted -> nested.
+                       const dotted = (triagePayload as any)?.triage_file_content ?? flatForTriage ?? {};
+                       let nested = dotted;
+                       try {
+                         const normMod: any = await import('../../common/normalizer.hybrid');
+                         if (typeof normMod.unflattenDotmap === 'function') nested = normMod.unflattenDotmap(dotted);
+                       } catch {}
+                       const outgoing = { alert_json: nested };
+                       const body = JSON.stringify(outgoing);
+                       console.log('supervisorCall', { url: supervisorUrl, wrapper: 'alert_json', keys: Object.keys(dotted).slice(0,5), timeoutMs });
+                       const supRes = await fetchFn(supervisorUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body, signal: controller.signal });
                        try {
                          supervisorResp = await supRes.json();
                        } catch (e) {
@@ -170,17 +192,89 @@ export const normalizationService = {
                        clearTimeout(to);
                      }
 
-                     // attach supervisor response into wide.meta JSON
+                     // Do not merge supervisor response into wide.meta for now
                      try {
-                       const metaObj = wide.meta ? JSON.parse(wide.meta) : {};
-                       metaObj.supervisor = supervisorResp;
-                       wide.meta = JSON.stringify(metaObj);
+                       // intentionally skipping persistence of supervisorResp
+                       console.log('supervisorResp received (not persisted)', typeof supervisorResp === 'string' ? supervisorResp : JSON.stringify(supervisorResp));
                      } catch (e) {
-                       console.warn('failed to attach supervisor response to wide.meta', e);
+                       // ignore logging issues
                      }
                    } catch (e: any) {
                      console.warn('supervisor call failed', e?.message || e);
                    }
+
+                   // After supervisor has done its work, call create-graph with the same triage payload
+                   try {
+                     const createGraphUrl = process.env.CREATE_GRAPH_URL || 'https://91baa41b9d55.ngrok-free.app/create-graph';
+                     const createGraphTimeout = Number(process.env.CREATE_GRAPH_TIMEOUT_MS || '30000');
+
+                     // Build dotted payload and pretty JSON bytes (same as triage)
+                     const dotted = (triagePayload as any)?.triage_file_content ?? flatForTriage ?? {};
+                     const prettyJson = JSON.stringify(dotted, null, 2);
+                     let fileNameToUse = String(triagePayload?.triage_file_name || `${String(row.alpha_id || 'alert')}.json`);
+                     try { if (!fileNameToUse.toLowerCase().endsWith('.json')) fileNameToUse = fileNameToUse.replace(/\.[^.]+$/, '') + '.json'; } catch {}
+
+                     const FormDataMod: any = await import('form-data');
+                     const FormDataCtor = (FormDataMod && (FormDataMod.default || FormDataMod));
+                     const fd = new FormDataCtor();
+                     fd.append('file', Buffer.from(prettyJson), { filename: fileNameToUse, contentType: 'application/json' });
+
+                     if (process.env.TRIAGE_INCLUDE_SCALARS === '1') {
+                       const scalarFields = ['id','alpha_id','file_name','sha256','sha1','file_path','severity_id','threat_name','source_vendor','source_product','event_time'];
+                       for (const k of scalarFields) {
+                         const v = (triagePayload as any)[k];
+                         if (v !== undefined && v !== null) fd.append(k, String(v));
+                       }
+                     }
+
+                     console.log('createGraphCall', { url: createGraphUrl, mode: 'multipart.submit.like.triage', timeoutMs: createGraphTimeout });
+
+                     async function submitMultipart(timeoutMs: number): Promise<{ ok: boolean; status: number; bodyText: string }> {
+                         return await new Promise((resolve, reject) => {
+                           let timedOut = false;
+                           const req: any = (fd as any).submit(createGraphUrl, (err: any, resp: any) => {
+                             if (timedOut) return;
+                             if (err) return reject(err);
+                             const chunks: any[] = [];
+                             resp.on('data', (c: any) => chunks.push(c));
+                             resp.on('end', () => {
+                               const bodyText = Buffer.concat(chunks).toString('utf8');
+                               resolve({ ok: resp.statusCode >= 200 && resp.statusCode < 300, status: resp.statusCode, bodyText });
+                             });
+                             resp.on('error', reject);
+                           });
+                           setTimeout(() => { timedOut = true; try { req && req.abort && req.abort(); } catch {} reject(new Error('create-graph timeout')); }, timeoutMs);
+                         });
+                       }
+
+                       let cgRes1: any = null;
+                       try {
+                         cgRes1 = await submitMultipart(createGraphTimeout);
+                       } catch (e: any) {
+                         console.warn('createGraph multipart submit error', e?.message || e);
+                       }
+
+                       if (!cgRes1 || !cgRes1.ok) {
+                         const body1 = cgRes1 ? cgRes1.bodyText : '';
+                         if (cgRes1) console.warn('createGraph attempt1 failed', { status: cgRes1.status, body: String(body1).slice(0,200) });
+                         // Fallback 1: raw dotted JSON
+                         try {
+                           const localFetch = (globalThis as any).fetch || (await import('node-fetch')).default;
+                           console.log('createGraphCall', { url: createGraphUrl, mode: 'json.dotted', timeoutMs: createGraphTimeout });
+                           const r2 = await localFetch(createGraphUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: prettyJson });
+                           let out2: any = null; try { out2 = await r2.json(); } catch { out2 = await r2.text().catch(() => ''); }
+                           console.log('createGraphResp', { status: r2.status, body: typeof out2 === 'string' ? out2 : JSON.stringify(out2) });
+                         } catch (e: any) {
+                           console.warn('createGraph raw json fallback failed', e?.message || e);
+                         }
+                       } else {
+                         console.log('createGraphResp', { status: cgRes1.status, body: String(cgRes1.bodyText).slice(0,200) });
+                       }
+                     } catch (e: any) {
+                       console.warn('create-graph call failed', e?.message || e);
+                     }
+                 } else {
+                   console.log('supervisor skipped due to ruleScore outside 0-79', { ruleScore });
                  }
                } catch (e) {
                  console.warn('error evaluating ruleScore or calling supervisor', e);
