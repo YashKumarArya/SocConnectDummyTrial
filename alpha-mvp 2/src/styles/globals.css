@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+@theme {
+  --font-lato: "Lato", sans-serif;
+  --font-roboto: "Roboto", sans-serif;
+  --font-rubik: "Rubik", sans-serif;
+  --font-smooch: "Smooch Sans", sans-serif;
+  --font-bebas: "Bebas Neue", sans-serif;
+  --font-sans: var(--font-lato);
+}
+
+
+.no-scrollbar::-webkit-scrollbar { display: none }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none }
