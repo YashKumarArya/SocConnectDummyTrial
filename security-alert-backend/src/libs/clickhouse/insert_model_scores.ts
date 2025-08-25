@@ -33,6 +33,22 @@ export type WideRow = {
   rule_confidence: number;
   rule_verdict: string;
   rule_meta: string; // JSON string: triage.metadata
+
+  // From supervisor/agents (optional fields)
+  gnn_confidence?: number;
+  gnn_verdict?: string;
+  gnn_meta?: string;
+
+  edr_score?: number;
+  edr_verdict?: string;
+  edr_meta?: string;
+
+  supervisor_score?: number;
+  supervisor_verdict?: string;
+  supervisor_meta?: string;
+
+  // Optional summary text
+  summary?: string;
 };
 
 export function fromTriageToWideRow(
@@ -79,9 +95,8 @@ export async function insertTriageWide(rows: WideRow[]) {
   }
 
   for (const chunk of chunks) {
-    // Insert into the table created by the user: alert_model_scores_wide
-    // Provide an explicit column list matching the JSON rows we build.
-    const sql = `INSERT INTO alert_model_scores_wide (alert_id, alpha_id, rule_confidence, rule_verdict, rule_meta) FORMAT JSONEachRow`;
+    // Let ClickHouse map JSON keys to columns; omitted fields take type defaults.
+    const sql = `INSERT INTO soc.alert_model_scores_wide FORMAT JSONEachRow`;
     const body = chunk.map((r) => JSON.stringify(r)).join('\n');
     await postSQL(sql, body);
   }
